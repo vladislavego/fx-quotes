@@ -1,0 +1,19 @@
+version: "2"
+
+run:
+  timeout: 3m
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - gosec
+    - ineffassign
+    - unused
+    - gocritic
+    - errorlint
+    - bodyclose
+    - sqlclosecheck
+    - revive

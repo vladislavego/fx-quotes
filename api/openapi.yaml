@@ -1,0 +1,183 @@
+openapi: 3.0.0
+info:
+  title: FX Quotes Service
+  version: 1.0.0
+  description: Asynchronous currency exchange rate quotes service.
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  db:
+                    type: string
+                    example: up
+        "503":
+          description: Service is unhealthy (database unavailable)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: unavailable
+                  db:
+                    type: string
+                    example: down
+
+  /api/v1/quote-updates:
+    post:
+      summary: Request quote update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pair
+              properties:
+                pair:
+                  type: string
+                  example: EUR/MXN
+                  description: "Supported pairs: EUR/USD, USD/EUR, EUR/MXN, MXN/EUR, USD/MXN, MXN/USD"
+                request_id:
+                  type: string
+                  maxLength: 64
+                  description: Idempotency key (optional)
+      responses:
+        "202":
+          description: Update accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  update_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [pending]
+        "400":
+          description: Invalid request (bad JSON, unsupported pair, or invalid request_id)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: request_id already used for a different pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/quote-updates/{id}:
+    get:
+      summary: Get quote update by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Update status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  pair:
+                    type: string
+                  status:
+                    type: string
+                    enum: [pending, done, failed]
+                  price:
+                    type: string
+                    nullable: true
+                    description: Decimal string (e.g. "20.37")
+                  error:
+                    type: string
+                    nullable: true
+                  created_at:
+                    type: string
+                    format: date-time
+                  updated_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+        "400":
+          description: Invalid id format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Update not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/quote-updates/latest:
+    get:
+      summary: Get latest quote by pair
+      parameters:
+        - in: query
+          name: pair
+          required: true
+          schema:
+            type: string
+            example: EUR/MXN
+      responses:
+        "200":
+          description: Latest completed quote
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pair:
+                    type: string
+                  price:
+                    type: string
+                    description: Decimal string (e.g. "20.37")
+                  updated_at:
+                    type: string
+                    format: date-time
+        "400":
+          description: Missing or unsupported pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No completed quotes found for this pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
